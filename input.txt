@@ -1,0 +1,37 @@
+[sProblemParameters]
+type                1001
+[sDomainParameters]
+h                   0.01
+lengthX             1.0 
+lengthY             0.8 
+lengthZ             0.8
+[sTimeParameters]
+startValue          0.0
+endValue            6.0
+separationValue     0.01
+[sImmersedBoundaryParameters]
+height              1.0
+radius              0.11
+step                0.01
+y_begin_center      0.4
+z_begin_center      0.4
+y_end_center        0.4
+z_end_center        0.4
+type                1
+[sPhysicalParameters]
+Re                  100.0
+PressureInput       10.0
+PressureOutput      0.0
+Viscosity coef.     1.5
+soluteDensity       1.5
+envDensity          1.0
+[sAneurysmParameters] 
+x_center            0.4
+y_center            0.3
+z_center            0.3
+radius              0.2
+radiusAdd           0.1
+stifnessMin         100
+type                2
+
+
