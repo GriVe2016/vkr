@@ -4,19 +4,19 @@
 #include "stdafx.h"
 #include "param.h"
 #include "geom.h"
-#include "service.h"
 #include "immersedboundary.h"
 #include <iostream>
 
 using namespace std;
 
 
-bool InputHole(int i, int j, int k, int N, int L, int M);
+
 bool CylinderMask(int i, int j, int k, int L, int M, int K);
-bool ConcentrationInletMask(int i, int j, int k, int L, int M, int K);
 bool InitialConcentrationDistribution(int i, int j, int k, int L, int M, int K);
 bool InitialViscosityDistribution(int i, int j, int k, int L, int M, int K);
-bool initialDensityDistribution(int i, int j, int k, int N, int L, int M);
+long double GetBorderConditionU(int lI, int lJ, int lK, int lN);
+long double GetBorderConditionV(int lI, int lJ, int lK, int lN);
+long double GetBorderConditionW(int lI, int lJ, int lK, int lN);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -29,7 +29,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	cInputParameters inpParams(inpfile);     // заполнение входных параметров из файла
 	
 
-	cGeometry problem(inpParams.domainParams); //основная сетка
+	cGeometry geometry(inpParams.domainParams); //основная сетка
 	inpParams.timeParams.UpdateSeparationValue(); //  временные параметры
 
 	cImmersedBoundary immersedBoundary(&inpParams); 
@@ -44,9 +44,9 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	//Previous time step (Begin)
 	/*
-	TRnRelease3dSpace* u_1Ptr = NULL;
-	TRnRelease3dSpace* v_1Ptr = NULL;
-	TRnRelease3dSpace* w_1Ptr = NULL;
+	TRnRelease3dSpace* geometry.U1->fieldPtr = NULL;
+	TRnRelease3dSpace* geometry.V1->fieldPtr = NULL;
+	TRnRelease3dSpace* geometry.W1->fieldPtr = NULL;
 	//Previous time step (End)
 
 	//Intermediate (Begin)
@@ -103,8 +103,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	(*fW) |= 0;
 	(*fP) |= 0;
 	*/
-	problem.setFToZero();
-	cField rightPart(problem.NxP, problem.NyP, problem.NzP);// Наверно нужно пересоздавать для U, V ,W !!!!!!!!!!!!!!!
+	//geometry.setFToZero();
+	//cField rightPart(geometry.NxP, geometry.NyP, geometry.NzP);// Наверно нужно пересоздавать для U, V ,W !!!!!!!!!!!!!!!
 	cMask *maskPtr;
 	cField* vpPrevPtr;
 	cField* vpCurPtr;
@@ -122,7 +122,20 @@ int _tmain(int argc, _TCHAR* argv[])
 	clock_t start = clock();
 	clock_t end = clock();
 	double diff = 0;
+
 	*/
+	
+	geometry.setFToZero();
+	geometry.SetInitCondVis();
+	geometry.SetInitCondDensity();
+	//geometry.SetInitCondRho(inpParams);
+	geometry.SetInitCondC(inpParams);
+	geometry.prepareMesh();
+	
+	
+
+	
+	
 	int timeStepNumber;
 	long double currentTime,beginTime = inpParams.timeParams.startValue, endTime = inpParams.timeParams.endValue, dTime = inpParams.timeParams.separationValue;
 
@@ -136,840 +149,20 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		
 
-		problem.Uold = problem.Fx;
-		problem.Vold = problem.Fy;
-		problem.Wold = problem.Fz;
-		problem.Pold = problem.Fp;
-
-			//Previous time step (Begin)
-			problem.U1 = problem.Fx;
-			problem.V1 = problem.Fy;
-			problem.W1 = problem.Fz;
-			//Previous time step (End)
-
-			//Intermediate (Begin)
-			problem.U = problem.Fx;
-			problem.V = problem.Fy;
-			problem.W = problem.Fz;
-			//Intermediate (End)
-
-			//For control stating (Begin)
-			problem.Us = problem.Fx;
-			problem.Vs = problem.Fy;
-			problem.Ws = problem.Fz;
-			//For control stating (End)
-			rightPart = 0.0;
-
-
-
-
 		
-	
-
-		
-			problem.MaskRho = problem.MaskP; //нужно добавить переприсвоение нормалей
-			for (int i = 0; i < problem.MaskRho.Nx; i++)
-			{
-				for (int j = 0; j < problem.MaskRho.Ny; j++)
-				{
-					for (int k = 0; k < problem.MaskRho.Nz; k++)
-					{
-						int mijk = problem.MaskRho.param[i][j][k].type;
-						
-						if (mijk == TPreDefinedBorderPoint)
-						{
-							if (i == 0 || j == 0 || k == 0)
-							{
-								problem.MaskRho.param[i][j][k].type = mijk;
-							}
-							else if (i == problem.MaskRho.Nx || j == problem.MaskRho.Ny || k == problem.MaskRho.Nz)
-							{
-								problem.MaskRho.param[i][j][k].type = TPreNormalBorderPoint;
-							}
-							else
-							{
-								//printf("N = %d, L = %d, M = %d\n", N, L, M);
-								printf("i = %d, j = %d, k = %d\n", i, j, k);
-								throw "Error in TVPProblem::SolveBySplitting: Unknown concentration PreDefined point mask type.";
-							}
-						}
-						else if (mijk == TFictivePoint)
-						{
-							if (((j == 0) || (j == problem.MaskRho.Ny)) && (i != 0) && (i != problem.MaskRho.Nx) && (k != 0) && (k != problem.MaskRho.Nz))
-							{
-								problem.MaskRho.param[i][j][k].type = TPreNormalBorderPoint;
-							}
-							else if (((k == 0) || (k == problem.MaskRho.Nz)) && (i != 0) && (i != problem.MaskRho.Nx) && (j != 0) && (j != problem.MaskRho.Ny))
-							{
-								problem.MaskRho.param[i][j][k].type = TPreNormalBorderPoint;
-							}
-							else if (((i == 0) || (i == problem.MaskRho.Nx)) && (k != 0) && (k != problem.MaskRho.Nz) && (j != 0) && (j != problem.MaskRho.Ny))
-							{
-								problem.MaskRho.param[i][j][k].type = TPreNormalBorderPoint;
-							}
-							else
-							{
-								problem.MaskRho.param[i][j][k].type = mijk;
-							}
-						}
-						else
-						{
-							throw "Error in TVPProblem::SolveBySplitting: Unknown density point mask type.";
-						}
-					}
-				}
-			}
-
-			for (int i = 0; i < problem.MaskRho.Nx; i++)
-			{
-				for (int j = 0; j <problem.MaskRho.Ny; j++)
-				{
-					for (int k = 0; k < problem.MaskRho.Nz; k++)
-					{
-						int mijk = problem.MaskRho.param[i][j][k].type;
-						if ((mijk == TActualPoint) || (mijk == TFictivePoint))
-						{
-							problem.MaskRho.param[i][j][k].type = mijk;
-						}
-						else if (mijk == TPreDefinedBorderPoint)
-						{
-							problem.MaskRho.param[i][j][k].type = TFictivePoint;
-						}
-						else if (mijk == TPreNormalBorderPoint)
-						{
-							problem.MaskRho.param[i][j][k].type = TActualPoint;
-						}
-						else
-						{
-							throw "Error in TVPProblem::SolveBySplitting: Unknown density point mask type.";
-						}
-					}
-				}
-			}
 
 
-				//initial conditions (Begin)
-			for (int i = 0; i < problem.MaskRho.Nx; i++)
-				{
-				for (int j = 0; j <problem.MaskRho.Ny; j++)
-					{
-					for (int k = 0; k < problem.MaskRho.Nz; k++)
-						{
-						problem.Rho.field[i][j][k]=inpParams.physicalParams.envDensityValue;
-						}
-					}
-				}
-
-			for (int i = 0; i < problem.MaskRho.Nx; i++)  
-				{
-				for (int j = 0; j < problem.MaskRho.Ny; j++)
-					{
-					for (int k = 0; k < problem.MaskRho.Nz; k++)
-						{
-						if (initialDensityDistribution(i, j, k, problem.MaskRho.Nx, problem.MaskRho.Ny, problem.MaskRho.Nz))
-							{
-								problem.Rho.field[i][j][k] = inpParams.physicalParams.soluteDensityValue;
-							}
-						}
-					}
-				}
 			
-
-
-			//Concentration (Begin)
-				//Mask modification for grid (Begin)
-				
-				for (int i = 0; i<problem.MaskC.Nx; i++)
-				{
-					for (int j = 0; j<problem.MaskC.Ny; j++)
-					{
-						for (int k = 0; k<problem.MaskC.Nz; k++)
-						{
-							if (i == 0 && ConcentrationInletMask(i, j, k, problem.MaskC.Nx, problem.MaskC.Ny, problem.MaskC.Nz))
-							{
-								problem.MaskC.param[i][j][k].type = TPreDefinedBorderPoint;
-								continue;
-							}
-							else if (!ConcentrationInletMask(i, j, k, problem.MaskC.Nx, problem.MaskC.Ny, problem.MaskC.Nz))
-							{
-								problem.MaskC.param[i][j][k].type = TPreNormalBorderPoint;
-								continue;
-							}
-
-							int mijk = problem.MaskC.param[i][j][k].type ;
-							if (mijk == TActualPoint) { problem.MaskC.param[i][j][k].type  = mijk; }
-							else if (mijk == TPreDefinedBorderPoint)
-							{
-								if (i == 0 || j == 0 || k == 0) { problem.MaskC.param[i][j][k].type  = mijk; }
-								else if (i == problem.MaskC.Nx || j == problem.MaskC.Ny || k == problem.MaskC.Nz)
-								{ 
-									problem.MaskC.param[i][j][k].type  = TPreNormalBorderPoint; 
-								}
-								else
-								{
-									//printf("N = %d, L = %d, M = %d\n", N, L, M);
-									//printf("i = %d, j = %d, k = %d\n", i, j, k);
-									throw "Error in TVPProblem::SolveBySplitting: Unknown concentration PreDefined point mask type.";
-								}
-							}
-							else if (mijk == TFictivePoint)
-							{
-								if (((j == 0) || (j == problem.MaskC.Ny)) && (i != 0) && (i != problem.MaskC.Nx) && (k != 0) && (k != problem.MaskC.Nz))
-								{
-									problem.MaskC.param[i][j][k].type = TPreNormalBorderPoint;
-								}
-								else if (((k == 0) || (k == problem.MaskC.Nz)) && (i != 0) && (i != problem.MaskC.Nx) && (j != 0) && (j != problem.MaskC.Ny))
-								{
-									problem.MaskC.param[i][j][k].type  = TPreNormalBorderPoint;
-								}
-								else if (((i == 0) || (i == problem.MaskC.Nx)) && (k != 0) && (k != problem.MaskC.Nz) && (j != 0) && (j != problem.MaskC.Ny))
-								{
-									problem.MaskC.param[i][j][k].type  = TPreNormalBorderPoint;
-								}
-								else { problem.MaskC.param[i][j][k].type  = mijk; }
-							}
-							else
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Unknown concentration point mask type.";
-							}
-						} //by k
-					} //by j
-				} //by i			  
-				//Mask modification for grid (End)
-
-				//Mask modification for space (Begin)
-				for (int i = 0; i<problem.MaskC.Nx; i++)
-				{
-					for (int j = 0; j<problem.MaskC.Ny; j++)
-					{
-						for (int k = 0; k<problem.MaskC.Nz; k++)
-						{
-							int mijk = problem.MaskC.param[i][j][k].type ;
-							if ((mijk == TActualPoint) || (mijk == TFictivePoint)) {problem.MaskC.param[i][j][k].type  = mijk; }
-							else if (mijk == TPreDefinedBorderPoint)
-							{
-								problem.MaskC.param[i][j][k].type  = TFictivePoint;
-							}
-							else if (mijk == TPreNormalBorderPoint)
-							{
-								problem.MaskC.param[i][j][k].type  = TActualPoint;
-							}
-							else
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Unknown concentration point mask type.";
-							}
-						}
-					}
-				}
-				//Mask modification for space (End)
-				//initial conditions (Begin)
-				for (int i = 0; i<problem.MaskRho.Nx; i++)
-				{
-					for (int j = 0; j<problem.MaskRho.Ny; j++)
-					{
-						for (int k = 0; k<problem.MaskRho.Nz; k++)
-						{
-							problem.C1.field[i][j][k] = 0;
-							problem.C.field[i][j][k] = 0;
-						}
-					}
-				}
-
-				for (int i = 0; i<problem.MaskRho.Nx; i++)
-				{
-					for (int j = 0; j < problem.MaskRho.Ny; j++)
-					{
-						for (int k = 0; k < problem.MaskRho.Nz; k++)
-						{
-							if (InitialConcentrationDistribution(i, j, k, problem.Rho.Nx, problem.Rho.Ny, problem.Rho.Nz))
-							{
-								problem.C.field[i][j][k] = 0.1;
-							}
-						}
-					}
-				}
-
-				//initial conditions (End)		   		   
-			}
-			//Concentration (End)
-
-
-			//Viscosity (Begin)	 
-			
-				//Mask modification for grid (Begin)
-	
-				for (int i = 0; i<problem.MaskV.Nx; i++)
-				{
-					for (int j = 0; j<problem.MaskV.Ny; j++)
-					{
-						for (int k = 0; k<problem.MaskV.Nz; k++)
-						{
-							int mijk = problem.MaskV.param[i][j][k].type;
-							if (mijk == TActualPoint) { problem.MaskV.param[i][j][k].type = mijk; }
-							else if (mijk == TPreDefinedBorderPoint) { problem.MaskV.param[i][j][k].type = TFictivePoint; }
-							else if (mijk == TFictivePoint) { problem.MaskV.param[i][j][k].type = mijk; }
-							else
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Unknown viscosity point mask type.";
-							}
-						} //by k
-					} //by j
-				} //by i			  
-				//Mask modification for grid (End)
-				
-
-				//Mask modification for space (Begin)
-				for (int i = 0; i<problem.MaskV.Nx; i++)
-				{
-					for (int j = 0; j<problem.MaskV.Ny; j++)
-					{
-						for (int k = 0; k<problem.MaskV.Nz; k++)
-						{
-							int mijk = problem.MaskV.param[i][j][k].type;
-							if ((mijk == TActualPoint) || (mijk == TFictivePoint)) { problem.MaskV.param[i][j][k].type = mijk; }
-							else
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Unknown viscosity point mask type.";
-							}
-						}
-					}
-				}
-				//Mask modification for space (End)
 			
 				
-				//initial conditions (Begin)
-				for (int i = 0; i<problem.MaskRho.Nx; i++)
-				{
-					for (int j = 0; j<problem.MaskRho.Ny; j++)
-					{
-						for (int k = 0; k<problem.MaskRho.Nz; k++)
-						{
-							int mijk = problem.MaskRho.param[i][j][k].type;
-							if (mijk == TActualPoint) { problem.MaskRho.param[i][j][k].type = 1 / inpParams.physicalParams.Re; }
-							else if (mijk == TFictivePoint) { problem.MaskRho.param[i][j][k].type = 0; }
-							else
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Unknown viscosity point mask type.";
-							}
-						}
-					}
-				}
-
-				for (int i = 0; i<problem.MaskRho.Nx; i++)
-				{
-					for (int j = 0; j < problem.MaskRho.Ny; j++)
-					{
-						for (int k = 0; k < problem.MaskRho.Nz; k++)
-						{
-							if (InitialViscosityDistribution(i, j, k, problem.MaskRho.Nx, problem.MaskRho.Ny, problem.MaskRho.Nz))
-							{
-								problem.MaskRho.param[i][j][k].type = inpParams.physicalParams.visValue;
-							}
-						}
-					}
-				}
-
-				//initial conditions (End)		   		   
 			
-			//Viscosity (End)
-
-		
 
 
 
 		
 
 		
-				//Concentration (Begin)
-		{
-			
-			
-			//Transfer terms (Begin)
-			cField uTr;
-			cField vTr;
-			cField wTr;
-			cField rpTr;
-			//Transfer terms (End)
-
-			for (int eq = 1; eq<4;eq++)
-			{
-				printf("Velocity equation %d: Starting...\n", eq);
-
-				//Current grid (Begin)
-
-			/*	if (eq == 1) { gridPtr = fGridU; }
-				else if (eq == 2) { gridPtr = fGridV; }
-				else if (eq == 3) { gridPtr = fGridW; }
-				else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }*/
-				
-
-			/*	int N = grid.GetSeparator1().EndIndex;
-				int L = grid.GetSeparator2().EndIndex;
-				int M = grid.GetSeparator3().EndIndex;
-				const T3dNumberMask& mask = grid.Mask;*/
-				//Current grid (End)
-
-				////Current vectors (Begin)
-				//TRnRelease3dSpace* vecPrevPtr;
-				//TRnRelease3dSpace* vecCurPtr;
-				//if (eq == 1) { vecPrevPtr = &u_1; vecCurPtr = &u_; }
-				//else if (eq == 2) { vecPrevPtr = &v_1; vecCurPtr = &v_; }
-				//else if (eq == 3) { vecPrevPtr = &w_1; vecCurPtr = &w_; }
-				//else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-				//TRnRelease3dSpace& f_1 = *vecPrevPtr;
-				//TRnRelease3dSpace& f_ = *vecCurPtr;
-				//Current vectors (End)
-
-				//Transfer terms (Begin)
-				cField uTr;
-				cField vTr;
-				cField wTr;
-				cField rpTrRef;
-
-				cField rpTr_X, rpTr_Y, rpTr_Z;///узнать чему должны быть равны значения
-
-				if (eq == 1) { rpTrRef = rpTr_X; }
-				else if (eq == 2) { rpTrRef = rpTr_Y; }
-				else if (eq == 3) { rpTrRef = rpTr_Z; }
-				else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-
-				if (eq == 1 && timeStepNumber == 1)
-				{
-					/*char u_fileName[] = "u.txt";
-					FILE* u_file = file_open(u_fileName, "r");
-					printf("\nNonzero U:\n");*/ // про какой файл идет речь?
-
-
-					for (int i = 0; i < problem.MaskRho.Nx; i++)
-					{
-						for (int j = 0; j < problem.MaskRho.Ny; j++)
-						{
-							for (int k = 0; k < problem.MaskRho.Nz; k++)
-							{
-								//fscanf_s(u_file, "%lf ", &u_1[i][j][k]);
-								//if (u_1[i][j][k] != 0.00) printf("%lf ", u_1[i][j][k]);
-							}
-						}
-					}
-					//fclose(u_file);
-
-				}
-
-				cField rpTr = rpTrRef;
-
-				//Transfer terms (End)
-
-
-				//Viscosity (Begin)
-				cField visTr;
-				//Viscosity (End)
-				cMask f_;
-
-				//Current vector - to zero (Begin)
-				//Current vector have to be calculated at all points (including border).   
-				for (int i = 0;i<problem.MaskRho.Nx;i++)
-				{
-					for (int j = 0;j<problem.MaskRho.Ny;j++)
-					{
-						for (int k = 0;k<problem.MaskRho.Nz;k++)
-						{
-							f_.param[i][j][k] = 0;
-						}
-					}
-				}
-				//Current vector - to zero (End)
-
-
-				//Convective items, right part, border conditions (Begin)
-				for (int i = 0;i<N + 1;i++)
-				{
-					for (int j = 0;j<L + 1;j++)
-					{
-						for (int k = 0;k<M + 1;k++)
-						{
-							int mijk = mask[i][j][k];
-							if (mijk == TFictivePoint)
-							{
-								uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0; rpTr[i][j][k] = 0;
-								//Viscosity (Begin)
-								visTr[i][j][k] = 0;
-								//Viscosity (End)
-							}
-							else if (mijk == TActualPoint)
-							{
-								if (eq == 1)
-								{
-									uTr[i][j][k] = u_1[i][j][k];
-									vTr[i][j][k] = (v_1[i][j][k] + v_1[i + 1][j][k] + v_1[i][j - 1][k] + v_1[i + 1][j - 1][k]) / 4;
-									wTr[i][j][k] = (w_1[i][j][k] + w_1[i + 1][j][k] + w_1[i][j][k - 1] + w_1[i + 1][j][k - 1]) / 4;
-									//Viscosity (Begin)
-									visTr[i][j][k] = (vis[i][j][k] + vis[i + 1][j][k]) / 2;
-									//Viscosity (End)
-								}
-								else if (eq == 2)
-								{
-									uTr[i][j][k] = (u_1[i][j][k] + u_1[i][j + 1][k] + u_1[i - 1][j][k] + u_1[i - 1][j + 1][k]) / 4;
-									vTr[i][j][k] = v_1[i][j][k];
-									wTr[i][j][k] = (w_1[i][j][k] + w_1[i][j + 1][k] + w_1[i][j][k - 1] + w_1[i][j + 1][k - 1]) / 4;
-									//Viscosity (Begin)
-									visTr[i][j][k] = (vis[i][j][k] + vis[i][j + 1][k]) / 2;
-									//Viscosity (End)
-								}
-								else if (eq == 3)
-								{
-									uTr[i][j][k] = (u_1[i][j][k] + u_1[i][j][k + 1] + u_1[i - 1][j][k] + u_1[i - 1][j][k + 1]) / 4;
-									vTr[i][j][k] = (v_1[i][j][k] + v_1[i][j][k + 1] + v_1[i][j - 1][k] + v_1[i][j - 1][k + 1]) / 4;
-									wTr[i][j][k] = w_1[i][j][k];
-									//Viscosity (Begin)
-									visTr[i][j][k] = (vis[i][j][k] + vis[i][j][k + 1]) / 2;
-									//Viscosity (End)
-								}
-								else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-
-								rpTr[i][j][k] = 0; //no external actions          				
-							}
-							else if (mijk == TDefinedBorderPoint)
-							{
-								uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0;
-								//Viscosity (Begin)
-								visTr[i][j][k] = 0;
-								//Viscosity (End)
-								long double defVal;
-								if (eq == 1) { defVal = GetBorderConditionU(i, j, k, timeStepNumber); }
-								else if (eq == 2) { defVal = GetBorderConditionV(i, j, k, timeStepNumber); }
-								else if (eq == 3) { defVal = GetBorderConditionW(i, j, k, timeStepNumber); }
-								else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-								rpTr[i][j][k] = defVal;
-							}
-							else if (mijk == TPreDefinedBorderPoint)
-							{
-								uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0;
-								//Viscosity (Begin)
-								visTr[i][j][k] = 0;
-								//Viscosity (End)
-								long double defVal;
-								if (eq == 1) { defVal = GetBorderConditionU(i, j, k, timeStepNumber); }
-								else if (eq == 2) { defVal = GetBorderConditionV(i, j, k, timeStepNumber); }
-								else if (eq == 3) { defVal = GetBorderConditionW(i, j, k, timeStepNumber); }
-								else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-								rpTr[i][j][k] = defVal;
-							}
-							else if (mijk == TNormalBorderPoint)
-							{
-								//throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity.";
-
-								long double nx = (grid.Normals[i][j][k])->X;
-								long double ny = (grid.Normals[i][j][k])->Y;
-								long double nz = (grid.Normals[i][j][k])->Z;
-
-								uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0;
-								//Viscosity (Begin)
-								visTr[i][j][k] = 0;
-								//Viscosity (End)
-
-
-								long double defVal;
-								if (eq == 1)
-								{
-									if ((nx == 0) || (ny != 0) || (nz != 0))
-									{
-										throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity and this equation number and this normal vector.";
-									}
-									defVal = GetBorderConditionU(i, j, k, timeStepNumber);
-								}
-								else if (eq == 2)
-								{
-									//defVal = GetBorderConditionV(i,j,k,timeStepNumber);
-									// NOTE: Fixed here for complex conditions
-									throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity and this equation number.";
-								}
-								else if (eq == 3)
-								{
-									//defVal = GetBorderConditionW(i,j,k,timeStepNumber);
-									// NOTE: Fixed here for complex conditions
-									throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity and this equation number.";
-								}
-								else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-								rpTr[i][j][k] = defVal;
-							}
-							else if (mijk == TEquationBorderPoint)
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity.";
-
-								//Viscosity (Begin)
-								visTr[i][j][k] = 0;
-								//Viscosity (End)
-
-								long double nx = (grid.Normals[i][j][k])->X;
-								long double ny = (grid.Normals[i][j][k])->Y;
-								long double nz = (grid.Normals[i][j][k])->Z;
-
-								const long double* hx = grid.GetSeparator1().Separation;
-								const long double* hy = grid.GetSeparator2().Separation;
-								const long double* hz = grid.GetSeparator2().Separation;
-
-								T3dNormalGrid& gridP = dynamic_cast<T3dNormalGrid&>(*fGridP);
-								const long double* hxP = gridP.GetSeparator1().Separation;
-								const long double* hyP = gridP.GetSeparator2().Separation;
-								const long double* hzP = gridP.GetSeparator3().Separation;
-
-
-								long double h_1X = hx[i - 1];
-								long double hX = hx[i];
-								long double  hx2X = hx[i - 1] + hx[i];
-								long double  hxhxhX = hx[i - 1] * hx[i] * (hx[i - 1] + hx[i]) / 2;
-
-								long double h_1Y = hy[j - 1];
-								long double hY = hy[j];
-								long double hx2Y = hy[j - 1] + hy[j];
-								long double hxhxhY = hy[j - 1] * hy[j] * (hy[j - 1] + hy[j]) / 2;
-
-								long double h_1Z = hy[k - 1];
-								long double hZ = hy[k];
-								long double hx2Z = hy[k - 1] + hy[k];
-								long double hxhxhZ = hy[k - 1] * hy[k] * (hy[k - 1] + hy[k]) / 2;
-
-
-								long double eqVal = 0;
-
-								if (eq == 1)
-								{
-									if ((nx == 0) || (ny != 0) || (nz != 0))
-									{
-										throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity and this equation number and this normal vector.";
-									}
-
-									long double hxhxhUpX = hx[i] * hx[i + 1] * (hx[i] + hx[i + 1]) / 2;
-									long double hxhxhDownX = hx[i - 2] * hx[i - 1] * (hx[i - 2] + hx[i - 1]) / 2;
-
-									vTr[i][j][k] = (v_1[i][j][k] + v_1[i + 1][j][k] + v_1[i][j - 1][k] + v_1[i + 1][j - 1][k]) / 4;
-									wTr[i][j][k] = (w_1[i][j][k] + w_1[i + 1][j][k] + w_1[i][j][k - 1] + w_1[i + 1][j][k - 1]) / 4;
-
-
-									eqVal = eqVal - (vTr[i][j][k])*(u_1[i][j + 1][k] - u_1[i][j - 1][k]) / (hx2Y);
-									eqVal = eqVal + (1 / fRe)*(hY*u_1[i][j - 1][k] - hx2Y*u_1[i][j][k] + h_1Y*u_1[i][j + 1][k]) / hxhxhY;
-
-									eqVal = eqVal - (wTr[i][j][k])*(u_1[i][j][k + 1] - u_1[i][j][k - 1]) / (hx2Z);
-									eqVal = eqVal + (1 / fRe)*(hZ*u_1[i][j][k - 1] - hx2Z*u_1[i][j][k] + h_1Z*u_1[i][j][k + 1]) / hxhxhZ;
-
-
-									//eqVal = eqVal - (p[i+1][j][k] - p[i][j][k])/hxP[i];
-
-
-									if (nx<0)
-									{
-										eqVal = eqVal - (u_1[i][j][k])*(u_1[i + 1][j][k] - u_1[i][j][k]) / (hx[i]);
-										eqVal = eqVal + (1 / fRe)*(hx[i + 1] * u_1[i][j][k] - (hx[i] + hx[i + 1])*u_1[i + 1][j][k] + hx[i] * u_1[i + 2][j][k]) / hxhxhUpX;
-									}
-									else
-									{
-										eqVal = eqVal - (u_1[i][j][k])*(u_1[i][j][k] - u_1[i - 1][j][k]) / (hx[i - 1]);
-										eqVal = eqVal + (1 / fRe)*(hx[i - 1] * u_1[i - 2][j][k] - (hx[i - 2] + hx[i - 1])*u_1[i - 1][j][k] + hx[i - 2] * u_1[i][j][k]) / hxhxhDownX;
-									}
-
-									eqVal = tau*eqVal + u_1[i][j][k];
-								}
-								else if (eq == 2)
-								{
-									throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity and this equation number.";
-								}
-								else if (eq == 3)
-								{
-									throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity and this equation number.";
-								}
-								else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-								uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0;
-								rpTr[i][j][k] = eqVal;
-							}
-							else if ((mijk == TPreNormalBorderPoint) || (mijk == TPreEquationBorderPoint))
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of velocity.";
-							}
-							else
-							{
-								throw "Error in TVPProblem::SolveBySplitting: Unknown point mask type.";
-							}
-						} //by k
-					} //by j
-				} //by i
-
-				TRnRelease3dSpace& rpTrTmp = dynamic_cast<TRnRelease3dSpace &>(f_1.CreateInstance());
-
-				const T3dNumberMask& maskC = (*gridCPtr).Mask;
-				for (int i = 1;i<N;i++)
-				{
-					for (int j = 1;j<L;j++)
-					{
-						for (int k = 1;k<M;k++)
-						{
-							maskC[i][j][k] = TActualPoint;
-						}
-					}
-				}
-
-				// eq is equal to TImmersedBoundary::COORD_*
-				if (eq == 1) {
-					GetForce(rpTrTmp, *gridCPtr, grid, uTr, eq, timeStepNumber);
-					//InterpolateUpdatePathes(grid, uTr, eq, timeStepNumber);
-				}
-				else if (eq == 2) {
-					GetForce(rpTrTmp, *gridCPtr, grid, vTr, eq, timeStepNumber);
-					//InterpolateUpdatePathes(grid, vTr, eq, timeStepNumber);
-				}
-				else if (eq == 3) {
-					GetForce(rpTrTmp, *gridCPtr, grid, wTr, eq, timeStepNumber);
-					//InterpolateUpdatePathes(grid, wTr, eq, timeStepNumber);
-				}
-
-				for (int i = 0;i<N + 1;i++)
-				{
-					for (int j = 0;j<L + 1;j++)
-					{
-						for (int k = 0;k<M + 1;k++)
-						{
-							int mijk = mask[i][j][k];
-							if (mijk == TActualPoint)
-							{
-								rpTr[i][j][k] = rpTrTmp[i][j][k];
-							}
-						}
-					}
-				}
-
-				//Convective items, right part, border conditions (End)
-
-				//Transfer equation (Begin)
-				//if (turbulenceMode==true)
-				//{
-				////Viscosity (Begin) 
-				const long double* hx = grid.GetSeparator1().Separation;
-				const long double* hy = grid.GetSeparator2().Separation;
-				const long double* hz = grid.GetSeparator3().Separation;
-
-				long double maxDVis = 0;
-
-				for (int i = 0;i<N + 1;i++)
-				{
-					for (int j = 0;j<L + 1;j++)
-					{
-						for (int k = 0;k<M + 1;k++)
-						{
-							int mijk = mask[i][j][k];
-							if (mijk == TActualPoint)
-							{
-								long double dVisX = (visTr[i + 1][j][k] - visTr[i - 1][j][k]) / (hx[i] + hx[i - 1]);
-								long double dVisY = (visTr[i][j + 1][k] - visTr[i][j - 1][k]) / (hy[j] + hy[j - 1]);
-								long double dVisZ = (visTr[i][j][k + 1] - visTr[i][j][k - 1]) / (hz[k] + hz[k - 1]);
-
-								if (fabsl(dVisX)>maxDVis) { maxDVis = fabsl(dVisX); }
-								if (fabsl(dVisY)>maxDVis) { maxDVis = fabsl(dVisY); }
-								if (fabsl(dVisZ)>maxDVis) { maxDVis = fabsl(dVisZ); }
-
-								long double dU = 0;
-								long double dV = 0;
-								long double dW = 0;
-
-								TRnRelease3dSpace* velTrPtr = NULL;
-								if (eq == 1)
-								{
-									velTrPtr = &uTr;
-									dU = (uTr[i + 1][j][k] - uTr[i - 1][j][k]) / (hx[i] + hx[i - 1]);
-									dV = (vTr[i + 1][j][k] - vTr[i - 1][j][k]) / (hx[i] + hx[i - 1]);
-									dW = (wTr[i + 1][j][k] - wTr[i - 1][j][k]) / (hx[i] + hx[i - 1]);
-
-									visTr[i][j][k] = (density[i][j][k] + density[i + 1][j][k]) / 2 * visTr[i][j][k];
-								}
-								else if (eq == 2)
-								{
-									velTrPtr = &vTr;
-									dU = (uTr[i][j + 1][k] - uTr[i][j - 1][k]) / (hy[j] + hy[j - 1]);
-									dV = (vTr[i][j + 1][k] - vTr[i][j - 1][k]) / (hy[j] + hy[j - 1]);
-									dW = (wTr[i][j + 1][k] - wTr[i][j - 1][k]) / (hy[j] + hy[j - 1]);
-
-									visTr[i][j][k] = (density[i][j][k] + density[i][j + 1][k]) / 2 * visTr[i][j][k];
-								}
-								else if (eq == 3)
-								{
-									velTrPtr = &wTr;
-									dU = (uTr[i][j][k + 1] - uTr[i][j][k - 1]) / (hz[k] + hz[k - 1]);
-									dV = (vTr[i][j][k + 1] - vTr[i][j][k - 1]) / (hz[k] + hz[k - 1]);
-									dW = (wTr[i][j][k + 1] - wTr[i][j][k - 1]) / (hz[k] + hz[k - 1]);
-
-									visTr[i][j][k] = (density[i][j][k] + density[i][j][k + 1]) / 2 * visTr[i][j][k];
-								}
-								else { throw "Error in TVPProblem::SolveBySplitting: Unknown equation number."; }
-								TRnRelease3dSpace& velTr = *velTrPtr;
-
-								long double dVelX = (velTr[i + 1][j][k] - velTr[i - 1][j][k]) / (hx[i] + hx[i - 1]);
-								long double dVelY = (velTr[i][j + 1][k] - velTr[i][j - 1][k]) / (hy[j] + hy[j - 1]);
-								long double dVelZ = (velTr[i][j][k + 1] - velTr[i][j][k - 1]) / (hz[k] + hz[k - 1]);
-
-
-								rpTr[i][j][k] = rpTr[i][j][k] + density[i][j][k] * (dVisX*(dVelX + dU) + dVisY*(dVelY + dV) + dVisZ*(dVelZ + dW));
-							}
-						}
-					}
-				}
-
-				//printf("Max vis. diff.: %lf\n",maxDVis);
-
-			//Convective items, right part, border conditions (Begin)
-		/*	for (int i = 0; i<problem.MaskRho.Nx; i++)
-			{
-				for (int j = 0; j<problem.MaskRho.Ny; j++)
-				{
-					for (int k = 0; k<problem.MaskRho.Nz; k++)
-					{
-						int mijk = mask[i][j][k];
-						if (mijk == TFictivePoint)
-						{
-							uTr.field[i][j][k] = 0; vTr.field[i][j][k] = 0; wTr.field[i][j][k] = 0; rpTr.field[i][j][k] = 0;
-						}
-						else if (mijk == TActualPoint)
-						{
-							long double uu = (u[i - 1][j][k] + u[i][j][k]) / 2;
-							uTr[i][j][k] = uu;
-
-							long double vv = (v[i][j - 1][k] + v[i][j][k]) / 2;
-							vTr[i][j][k] = vv;
-
-							long double ww = (w[i][j][k - 1] + w[i][j][k]) / 2;
-							wTr[i][j][k] = ww;
-
-							rpTr[i][j][k] = 0; //no external actions
-						}
-						else if (mijk == TPreDefinedBorderPoint)
-						{
-							uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0;
-							if (i == 0)
-							{
-								rpTr[i][j][k] = ConcentrationInletCondition(i, j, k, problem.MaskRho.Nx, problem.MaskRho.Ny, problem.MaskRho.Nz);
-							}
-							else
-							{
-								rpTr[i][j][k] = 0;
-							}
-
-							//rpTr[i][j][k] = 0;
-						}
-						else if (mijk == TPreNormalBorderPoint)
-						{
-							uTr[i][j][k] = 0; vTr[i][j][k] = 0; wTr[i][j][k] = 0;
-							rpTr[i][j][k] = 0;
-						}
-						else if ((mijk == TDefinedBorderPoint) || (mijk == TNormalBorderPoint) || (mijk == TEquationBorderPoint) || (mijk == TPreEquationBorderPoint))
-						{
-							throw "Error in TVPProblem::SolveBySplitting: Method is not implemented for this point border type of concentration.";
-						}
-						else
-						{
-							throw "Error in TVPProblem::SolveBySplitting: Unknown concentration point mask type.";
-						}
-					} //by k
-				} //by j
-			} //by i
-			//Convective items, right part, border conditions (End)
-			SolveTransferEquation_(cnc, cnc_1, uTr, vTr, wTr, rpTr, gridC, 0.0);
+			//SolveTransferEquation_(cnc, cnc_1, uTr, vTr, wTr, rpTr, gridC, 0.0);
 			/*
 			//Recalculation (Begin)
 			for (int i = 0; i<N + 1; i++)
@@ -1693,9 +886,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			v_.Assign(v);
 			w_.Assign(w);
 
-			u_1.Assign(u);
-			v_1.Assign(v);
-			w_1.Assign(w);
+			geometry.U1->field.Assign(u);
+			geometry.V1->field.Assign(v);
+			geometry.W1->field.Assign(w);
 
 			//Concentration (Begin)
 			cnc_1.Assign(cnc);
@@ -1721,9 +914,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	printf("\n\n");
 	printf("Deleting temporary objects: Starting...\n");
 
-	delete u_1Ptr;
-	delete v_1Ptr;
-	delete w_1Ptr;
+	delete geometry.U1->fieldPtr;
+	delete geometry.V1->fieldPtr;
+	delete geometry.W1->fieldPtr;
 
 	delete u_Ptr;
 	delete v_Ptr;
@@ -1757,9 +950,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	//Deleting objects (End)
 
 	printf("\n\n");
-	printf("Splitting method: OK.\n");
+	printf("Splitting method: OK.\n");*/
 	}
-	*/
+	
 
 	
 
@@ -1767,28 +960,3 @@ int _tmain(int argc, _TCHAR* argv[])
 }
 
 
-bool initialDensityDistribution(int i, int j, int k, int N, int L, int M)
-{
-	return InputHole(i, j, k, N, L, M);
-};
-
-
-bool ConcentrationInletMask(int i, int j, int k, int L, int M, int K)
-{
-	return CylinderMask(i, j, k, L, M, K);
-};
-
-bool CylinderMask(int i, int j, int k, int L, int M, int K)
-{
-	return i == 0 && (j - L / 4 + 3)*(j - L / 4 + 3) + (k - M / 2)*(k - M / 2) < (L / 6)*(M / 6);
-};
-
-bool InitialConcentrationDistribution(int i, int j, int k, int L, int M, int K)
-{
-	return CylinderMask(i, j, k, L, M, K);
-};
-
-bool InitialViscosityDistribution(int i, int j, int k, int L, int M, int K)
-{
-	return CylinderMask(i, j, k, L, M, K);
-};

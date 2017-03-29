@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "nodetype.h"
 #include "immersedboundary.h"
 #include <math.h>
 
@@ -42,7 +41,7 @@ cImmersedBoundary::cImmersedBoundary(cInputParameters* inpParams)
 			//this->nodes[i + n * 120]->;
 		}
 	}
-
+		/*
 		if (inpParams->problemParams.type == aneurysm)
 		{
 
@@ -181,7 +180,7 @@ cImmersedBoundary::cImmersedBoundary(cInputParameters* inpParams)
 							//this->nodes[i + n * 120]->stretchingStiffness = this->stiffness*rc*rc + sin(rc/Rpip)*stiffness_plus;
 							this->nodes[i + n * this->radius_nodes]->stretchingStiffness = stiffness_plus; //+(this->stiffness - stiffness_plus)*sqrt(rc);    //sin(rc*0.5*M_PI / Rpip);
 							else*/
-							this->nodes[i + n *this->radius_nodes]->stretchingStiffness = this->stiffness;
+							//this->nodes[i + n *this->radius_nodes]->stretchingStiffness = this->stiffness;
 
 							// Verison 1 (not good)
 							/*
@@ -190,12 +189,13 @@ cImmersedBoundary::cImmersedBoundary(cInputParameters* inpParams)
 							else
 							this->nodes[i + n * 120]->stretchingStiffness=this->stiffness;
 							*/
-						}
+						//}
 						//this->zCenter += 0.005;
-					}
+					//}
 					//this->zCenter -= 0.005;
 					//printf("\nzCenter=%lf\n", this->zCenter);
-				}
+				//}
+/*
 
 			}
 			else if (type == 3)
@@ -424,14 +424,15 @@ cImmersedBoundary::cImmersedBoundary(cInputParameters* inpParams)
 							else
 							this->nodes[i + n * 120]->stretchingStiffness=this->stiffness;
 							*/
-						}
+						//}
 						//this->zCenter += 0.005;
-					}
+					//}
 					//this->zCenter -= 0.005;
 					//printf("\nzCenter=%lf\n", this->zCenter);
-				}
+				//}
 
-			}
+			//}
+/*
 		} 
 
 	for (int n = 0; n < this->height_nodes; ++n) {
@@ -472,8 +473,8 @@ cImmersedBoundary::cImmersedBoundary(cInputParameters* inpParams)
 					);
 			}
 			*/
-		}
-	}
+		//}
+	//}
 	/*
 	this->n_pathes = 6;
 	this->max_path_step = 1000;

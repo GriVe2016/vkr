@@ -1,5 +1,6 @@
-#include "nodetype.h"
+
 #include "param.h"
+#include "geom.h"
 #include <math.h>
 
 class TNode

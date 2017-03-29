@@ -1,4 +1,4 @@
-#include "nodetype.h"
+//#include "geom.h"
 
 #ifndef PARAMS
 #define PARAMS
@@ -11,6 +11,13 @@ struct sProblemParameters
 	int type;
 };
 
+struct sDomainParameters
+{
+	long double h;
+	long double lengthX, lengthY, lengthZ;
+
+};
+
 struct sAneurysmParameters
 {
 	long double x_center, y_center, z_center;
@@ -19,12 +26,7 @@ struct sAneurysmParameters
 	long double stifnessMin;
 	long double type;
 };
-struct sDomainParameters
-{
-	long double h;
-	long double lengthX, lengthY, lengthZ;
 
-};
 
 struct sTimeParameters
 {
